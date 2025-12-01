@@ -1,0 +1,101 @@
+{
+    "name": "Airspace Copilot Workflow",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "seconds",
+                            "seconds": 60
+                        }
+                    ]
+                }
+            },
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://opensky-network.org/api/states/all",
+                "options": {}
+            },
+            "name": "Fetch OpenSky Data",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const states = $input.first().json.states || [];\nconst flights = states.map(s => ({\n  icao24: s[0],\n  callsign: s[1],\n  origin_country: s[2],\n  time_position: s[3],\n  last_contact: s[4],\n  longitude: s[5],\n  latitude: s[6],\n  baro_altitude: s[7],\n  on_ground: s[8],\n  velocity: s[9],\n  true_track: s[10],\n  vertical_rate: s[11],\n  sensors: s[12],\n  geo_altitude: s[13],\n  squawk: s[14],\n  spi: s[15],\n  position_source: s[16]\n}));\n\nreturn {json: {flights: flights}};"
+            },
+            "name": "Format Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://host.docker.internal:8000/update-flights",
+                "method": "POST",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json.flights }}",
+                "options": {}
+            },
+            "name": "Send to MCP Server",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                850,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch OpenSky Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch OpenSky Data": {
+            "main": [
+                [
+                    {
+                        "node": "Format Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Data": {
+            "main": [
+                [
+                    {
+                        "node": "Send to MCP Server",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
